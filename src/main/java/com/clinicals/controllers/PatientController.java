@@ -1,9 +1,12 @@
 package com.clinicals.controllers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,13 +16,16 @@ import org.springframework.web.bind.annotation.RestController;
 import com.clinicals.models.ClinicalData;
 import com.clinicals.models.Patient;
 import com.clinicals.repos.PatientRepository;
+import com.clinicals.util.BMICalculator;
 
 @RestController
 @RequestMapping("/api")
+@CrossOrigin // To communicate between different ports with the ReactApp with AJAX calls
 public class PatientController {
 
 	// Restful controller API
 	private PatientRepository repository;
+	Map<String, String> filters = new HashMap<>();
 
 	@Autowired
 	PatientController(PatientRepository repository) {
@@ -51,24 +57,21 @@ public class PatientController {
 		Patient patient = repository.findById(id).get();
 		List<ClinicalData> clinicalData = patient.getClinicalData();
 
-		ArrayList<ClinicalData> duplicateClinicalData = new ArrayList<>(clinicalData);
+		List<ClinicalData> duplicateClinicalData = new ArrayList<>(clinicalData);
 
 		for (ClinicalData eachEntry : duplicateClinicalData) {
-			if (eachEntry.getComponentName().equals("hw")) {
-
-				String[] heightAndWeight = eachEntry.getComponentValue().split("/");
-
-				if (heightAndWeight != null && heightAndWeight.length > 1) {
-
-					float heightInMeters = Float.parseFloat(heightAndWeight[0]) * 0.4536F;
-					float bmi = Float.parseFloat(heightAndWeight[1]) / (heightInMeters * heightInMeters);
-					ClinicalData bmiData = new ClinicalData();
-					bmiData.setComponentName("bmi");
-					bmiData.setComponentValue(Float.toString(bmi));
-					clinicalData.add(bmiData);
-				}
+			// Simple filtering logic using a hashmap to store unique keys and remove
+			// duplicates after a new data insertion
+			if (filters.containsKey(eachEntry.getComponentName())) {
+				clinicalData.remove(eachEntry); //
+				continue;
+			} else {
+				filters.put(eachEntry.getComponentName(), null);
 			}
+
+			BMICalculator.calculateBMI(clinicalData, eachEntry);
 		}
+		filters.clear();
 		return patient;
 	}
 
